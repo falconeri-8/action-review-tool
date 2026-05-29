@@ -4,9 +4,9 @@ An internal tool for organizations that want to track and review updates in thei
 
 **Snapshots**
 
-![alt text](image.png)
+![alt text](Data/image.png)
 
-![alt text](image-1.png)
+![alt text](Data/image-1.png)
 
 **Download**
 ```bash 

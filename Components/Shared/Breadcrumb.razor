@@ -1,0 +1,29 @@
+@inject NavigationManager Nav
+
+<nav class="crumbs" aria-label="Breadcrumb">
+    @for (var i = 0; i < Items.Count; i++)
+    {
+        var item = Items[i];
+        var isLast = i == Items.Count - 1;
+        if (i > 0)
+        {
+            <span class="crumb-sep">/</span>
+        }
+        @if (isLast || string.IsNullOrEmpty(item.Path))
+        {
+            <span class="crumb is-current">@item.Label</span>
+        }
+        else
+        {
+            <a class="crumb" href="@item.Path" @onclick="@(() => Go(item.Path!))" @onclick:preventDefault>@item.Label</a>
+        }
+    }
+</nav>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Crumb> Items { get; set; } = Array.Empty<Crumb>();
+
+    private void Go(string path) => Nav.NavigateTo(path);
+
+    public record Crumb(string Label, string? Path = null);
+}

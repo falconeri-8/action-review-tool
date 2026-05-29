@@ -1,0 +1,83 @@
+@inject IJSRuntime JS
+
+<TextField Label="Attachments" Index="@Index">
+    <label class="dropzone @(Items.Count > 0 ? "has-files" : "")">
+        @if (Items.Count == 0)
+        {
+            <div class="dropzone-prompt">
+                <span>+ Select Files</span>
+                <span class="muted">PDF · PNG · JPG · DOCX · ZIP · TXT · CODE</span>
+            </div>
+        }
+        else
+        {
+            <div class="dropzone-files">
+                @foreach (var item in Items)
+                {
+                    <div class="dropzone-file">
+                        <span class="dropzone-file-name">@item.FileName</span>
+                        <span class="dropzone-file-size">@FormatSize(item.Size)</span>
+                        <button type="button" class="dropzone-file-remove" @onclick="@(() => Remove(item))" @onclick:stopPropagation>×</button>
+                    </div>
+                }
+                <span class="dropzone-prompt small">+ Add More</span>
+            </div>
+        }
+        <InputFile OnChange="OnChange" multiple accept="@Accept" style="display:none" />
+    </label>
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <span class="error-line">@Error</span>
+    }
+</TextField>
+
+@code {
+    [Parameter] public string? Index { get; set; }
+    [Parameter] public List<Attachment> Items { get; set; } = new();
+    [Parameter] public EventCallback<List<Attachment>> ItemsChanged { get; set; }
+
+    private string Error = "";
+
+    private string Accept => string.Join(",", FileGuard.AllowedExtensions);
+
+    private async Task OnChange(InputFileChangeEventArgs e)
+    {
+        Error = "";
+        foreach (var f in e.GetMultipleFiles(20))
+        {
+            if (!FileGuard.IsAllowed(f.Name))
+            {
+                Error = $"File type not allowed: {Path.GetExtension(f.Name)}";
+                continue;
+            }
+            if (f.Size > FileGuard.MaxBytes)
+            {
+                Error = $"File exceeds 25MB: {f.Name}";
+                continue;
+            }
+            using var ms = new MemoryStream();
+            await f.OpenReadStream(FileGuard.MaxBytes).CopyToAsync(ms);
+            Items.Add(new Attachment
+            {
+                FileName = f.Name,
+                ContentType = string.IsNullOrEmpty(f.ContentType) ? "application/octet-stream" : f.ContentType,
+                Size = f.Size,
+                Data = ms.ToArray()
+            });
+        }
+        await ItemsChanged.InvokeAsync(Items);
+    }
+
+    private async Task Remove(Attachment a)
+    {
+        Items.Remove(a);
+        await ItemsChanged.InvokeAsync(Items);
+    }
+
+    private static string FormatSize(long b)
+    {
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{b / 1024.0:F1} KB";
+        return $"{b / 1048576.0:F1} MB";
+    }
+}

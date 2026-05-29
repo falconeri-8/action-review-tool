@@ -1,0 +1,45 @@
+<TextField Label="@Label" Index="@Index">
+    <label class="photo-upload @(HasPhoto ? "has-photo" : "")">
+        @if (HasPhoto)
+        {
+            <img src="@DataUri" alt="photo" />
+            <button type="button" class="photo-upload-clear" @onclick="Clear" @onclick:stopPropagation>×</button>
+        }
+        else
+        {
+            <span class="photo-upload-prompt">+ Select Image</span>
+        }
+        <InputFile OnChange="OnChange" accept="image/*" />
+    </label>
+</TextField>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Photo";
+    [Parameter] public string? Index { get; set; }
+    [Parameter] public byte[]? Bytes { get; set; }
+    [Parameter] public EventCallback<byte[]?> BytesChanged { get; set; }
+    [Parameter] public string? ContentType { get; set; }
+    [Parameter] public EventCallback<string?> ContentTypeChanged { get; set; }
+
+    private bool HasPhoto => Bytes is { Length: > 0 };
+
+    private string DataUri => HasPhoto
+        ? $"data:{ContentType ?? "image/png"};base64,{Convert.ToBase64String(Bytes!)}"
+        : "";
+
+    private async Task OnChange(InputFileChangeEventArgs e)
+    {
+        var f = e.File;
+        if (f.Size > FileGuard.MaxBytes) return;
+        using var ms = new MemoryStream();
+        await f.OpenReadStream(FileGuard.MaxBytes).CopyToAsync(ms);
+        await BytesChanged.InvokeAsync(ms.ToArray());
+        await ContentTypeChanged.InvokeAsync(string.IsNullOrEmpty(f.ContentType) ? "image/png" : f.ContentType);
+    }
+
+    private async Task Clear()
+    {
+        await BytesChanged.InvokeAsync(null);
+        await ContentTypeChanged.InvokeAsync(null);
+    }
+}

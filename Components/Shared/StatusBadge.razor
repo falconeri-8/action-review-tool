@@ -1,0 +1,12 @@
+<span class="status @CssFor(Status)">@Status.ToString()</span>
+
+@code {
+    [Parameter] public RequestStatus Status { get; set; }
+
+    private static string CssFor(RequestStatus s) => s switch
+    {
+        RequestStatus.Approved => "approved",
+        RequestStatus.Rejected => "rejected",
+        _ => "pending"
+    };
+}

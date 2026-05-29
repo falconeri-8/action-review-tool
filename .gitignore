@@ -1,0 +1,23 @@
+# .NET / Visual Studio
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.log
+*.db
+*.sqlite
+.DS_Store
+
+# Rider / JetBrains
+.idea/
+
+# publish outputs / runtime/native libs
+/bin/
+/obj/
+/**/runtimes/
+
+# keep local appsettings out
+appsettings.Development.json
+Properties/launchSettings.json

@@ -1,0 +1,266 @@
+@page "/audit/requests"
+@inject SessionState Session
+@inject NavigationManager Nav
+@inject RequestService Requests
+@rendermode InteractiveServer
+
+<PageTitle>AUDIT // REQUESTS</PageTitle>
+
+@if (!Session.IsAuthenticated || Session.Current!.Play != Play.Contributor)
+{
+    <RedirectToLogin />
+}
+else
+{
+    <div class="frame frame-wide">
+        <Breadcrumb Items="@(new Breadcrumb.Crumb[] { new("Audit", "/audit"), new("Review Requests") })" />
+
+        <div class="heading">
+            <h1>Review Requests</h1>
+            <p>Submit new audit requests and track decisions</p>
+        </div>
+
+        <div class="toolbar">
+            <TextField Label="Search" Index="01">
+                <input class="input" placeholder="ID OR TITLE · E.G. REQ-0001" @bind="Query" @bind:event="oninput" @onkeyup="OnQueryKey" />
+            </TextField>
+            <button type="button" class="btn btn-primary" @onclick="OpenNew">+ New Request</button>
+        </div>
+
+        <div class="col-tight">
+            <span class="label">02 / Recent</span>
+            <div class="list">
+                @if (List is null)
+                {
+                    <span class="list-empty">Loading…</span>
+                }
+                else if (List.Count == 0)
+                {
+                    <span class="list-empty">No requests</span>
+                }
+                else
+                {
+                    @foreach (var r in List)
+                    {
+                        <RequestRow Request="r" Active="@(Selected?.Id == r.Id)" OnSelect="@(() => Open(r))" />
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <Overlay Open="ShowDetails" OnClose="CloseDetails" Wide="true">
+        @if (Selected is not null)
+        {
+            <div class="overlay-head">
+                <div class="col-tight" style="gap:0.5rem">
+                    <span class="overlay-id">@Selected.Code</span>
+                    <span class="overlay-title">@Selected.Title</span>
+                </div>
+                <div class="col-tight" style="gap:0.5rem; align-items:flex-end">
+                    <StatusBadge Status="Selected.Status" />
+                    <span class="row-meta">@Selected.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd · HH:mm")</span>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="kv">
+                    <span class="kv-key">Submitter</span>
+                    <span class="kv-val">@(Selected.Submitter?.FullName ?? "—")</span>
+                </div>
+                <div class="kv">
+                    <span class="kv-key">Reviewer</span>
+                    <span class="kv-val">@(Selected.Reviewer?.FullName ?? "—")</span>
+                </div>
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Tags</span>
+                <div class="tag-row">
+                    @if (Selected.Tags.Count == 0)
+                    {
+                        <span class="muted small uppercase">None</span>
+                    }
+                    @foreach (var t in Selected.Tags)
+                    {
+                        <span class="tag is-active">@t</span>
+                    }
+                </div>
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Description</span>
+                <div class="overlay-section-body">@(string.IsNullOrWhiteSpace(Selected.Description) ? "—" : Selected.Description)</div>
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Attachments</span>
+                @if (Selected.Attachments.Count == 0)
+                {
+                    <span class="muted small uppercase">None</span>
+                }
+                else
+                {
+                    <div class="attachments-list">
+                        @foreach (var a in Selected.Attachments)
+                        {
+                            <a class="attachment-link" href="@($"/files/{a.Id}")" target="_blank" rel="noopener">
+                                <span>@a.FileName</span>
+                                <span class="attachment-size">@FormatSize(a.Size)</span>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Reviewer Comment</span>
+                <div class="overlay-section-body">@(string.IsNullOrWhiteSpace(Selected.Comment) ? "—" : Selected.Comment)</div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary btn-grow" @onclick="CloseDetails">Close</button>
+            </div>
+        }
+    </Overlay>
+
+    <Overlay Open="ShowNew" OnClose="CloseNew" Wide="true">
+        <div class="overlay-head">
+            <div class="col-tight" style="gap:0.5rem">
+                <span class="overlay-id">NEW</span>
+                <span class="overlay-title">Submit Request</span>
+            </div>
+        </div>
+
+        <TextField Label="Title" Index="01">
+            <input class="input" placeholder="DESCRIPTIVE TITLE" @bind="NewTitle" @bind:event="oninput" />
+        </TextField>
+
+        <AttachmentPicker Index="02" Items="NewAttachments" ItemsChanged="OnAttachmentsChanged" />
+
+        <TextField Label="Description" Index="03">
+            <textarea class="textarea" rows="5" placeholder="OBJECTIVE · CONTEXT · DELIVERABLES" @bind="NewDescription" @bind:event="oninput"></textarea>
+        </TextField>
+
+        <TagSelector Index="04" Selected="NewTags" SelectedChanged="OnTagsChanged" />
+
+        @if (!string.IsNullOrEmpty(NewError))
+        {
+            <span class="error-line">@NewError</span>
+        }
+
+        <div class="btn-row">
+            <button class="btn btn-outline btn-grow" @onclick="CloseNew" disabled="@Submitting">Cancel</button>
+            <button class="btn btn-primary btn-grow" @onclick="SubmitNew" disabled="@Submitting">
+                @(Submitting ? "Submitting…" : "Submit Request")
+            </button>
+        </div>
+    </Overlay>
+}
+
+@code {
+    private List<Request>? List;
+    private Request? Selected;
+    private bool ShowDetails;
+    private bool ShowNew;
+    private string Query = "";
+
+    private string NewTitle = "";
+    private string NewDescription = "";
+    private List<Attachment> NewAttachments = new();
+    private List<RequestTag> NewTags = new();
+    private string NewError = "";
+    private bool Submitting;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        if (Session.Current is null) return;
+        List = await Requests.ForSubmitterAsync(Session.Current.Id, Query);
+    }
+
+    private async Task OnQueryKey(KeyboardEventArgs e) => await Reload();
+
+    private async Task Open(Request r)
+    {
+        Selected = await Requests.FindAsync(r.Id);
+        ShowDetails = true;
+    }
+
+    private void CloseDetails()
+    {
+        ShowDetails = false;
+        Selected = null;
+    }
+
+    private void OpenNew()
+    {
+        NewTitle = "";
+        NewDescription = "";
+        NewAttachments = new();
+        NewTags = new();
+        NewError = "";
+        ShowNew = true;
+    }
+
+    private void CloseNew()
+    {
+        if (Submitting) return;
+        ShowNew = false;
+    }
+
+    private void OnAttachmentsChanged(List<Attachment> items) => NewAttachments = items;
+    private void OnTagsChanged(List<RequestTag> tags) => NewTags = tags;
+
+    private async Task SubmitNew()
+    {
+        NewError = "";
+        if (string.IsNullOrWhiteSpace(NewTitle))
+        {
+            NewError = "Title is required";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(NewDescription))
+        {
+            NewError = "Description is required";
+            return;
+        }
+        if (NewTags.Count == 0)
+        {
+            NewError = "At least one tag is required";
+            return;
+        }
+        if (NewAttachments.Count == 0)
+        {
+            NewError = "At least one attachment is required";
+            return;
+        }
+
+        Submitting = true;
+        try
+        {
+            var request = new Request
+            {
+                Title = NewTitle.Trim(),
+                Description = NewDescription.Trim(),
+                Tags = NewTags.ToList(),
+                SubmitterId = Session.Current!.Id
+            };
+            await Requests.CreateAsync(request, NewAttachments);
+            ShowNew = false;
+            await Reload();
+        }
+        finally
+        {
+            Submitting = false;
+        }
+    }
+
+    private static string FormatSize(long b)
+    {
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{b / 1024.0:F1} KB";
+        return $"{b / 1048576.0:F1} MB";
+    }
+}

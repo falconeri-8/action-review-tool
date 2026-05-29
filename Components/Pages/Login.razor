@@ -1,0 +1,78 @@
+@page "/"
+@inject AuthService Auth
+@inject SessionState Session
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>AUDIT // ACCESS</PageTitle>
+
+<div class="frame frame-narrow">
+    <div class="heading">
+        <h1>Access</h1>
+        <p>Authenticate to enter the audit system</p>
+    </div>
+
+    <form class="col" @onsubmit="Submit" @onsubmit:preventDefault>
+        <TextField Label="ID" Index="01">
+            <input class="input" type="text" inputmode="numeric" placeholder="0000" @bind="IdText" @bind:event="oninput" disabled="@Busy" />
+        </TextField>
+
+        <TextField Label="Password" Index="02">
+            <input class="input" type="password" placeholder="••••••••" @bind="Password" @bind:event="oninput" disabled="@Busy" />
+        </TextField>
+
+        @if (!string.IsNullOrEmpty(Error))
+        {
+            <span class="error-line">@Error</span>
+        }
+
+        <div class="btn-row">
+            <button type="submit" class="btn btn-primary btn-grow" disabled="@Busy">
+                @(Busy ? "Verifying…" : "Enter")
+            </button>
+        </div>
+
+        <div class="muted tiny uppercase" style="margin-top:1rem">
+            Seeded · 1 / admin · 2-3 / pass (contributors) · 4-5 / pass (reviewers)
+        </div>
+    </form>
+</div>
+
+@code {
+    private string IdText = "";
+    private string Password = "";
+    private string Error = "";
+    private bool Busy;
+
+    private async Task Submit()
+    {
+        Error = "";
+        if (!int.TryParse(IdText, out var id))
+        {
+            Error = "ID must be numeric";
+            return;
+        }
+        if (string.IsNullOrEmpty(Password))
+        {
+            Error = "Password required";
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var user = await Auth.AuthenticateAsync(id, Password);
+            if (user is null)
+            {
+                Error = "Invalid credentials";
+                return;
+            }
+            Session.SignIn(user);
+            Nav.NavigateTo("/audit");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}

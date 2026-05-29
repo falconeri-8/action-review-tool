@@ -1,0 +1,22 @@
+<button type="button" class="row @(Active ? "is-active" : "")" @onclick="OnSelect">
+    <div class="row-glyph">@Request.Code.Substring(4)</div>
+    <div class="row-body">
+        <span class="row-title">@Request.Title</span>
+        <span class="row-sub">@Request.Code · @Request.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd")</span>
+    </div>
+    @if (ShowReview && Request.Status == RequestStatus.Pending)
+    {
+        <span class="row-meta bright">Review</span>
+    }
+    else
+    {
+        <span class="row-meta">@Request.Status.ToString().ToUpperInvariant()</span>
+    }
+</button>
+
+@code {
+    [Parameter, EditorRequired] public Request Request { get; set; } = default!;
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public bool ShowReview { get; set; }
+    [Parameter] public EventCallback OnSelect { get; set; }
+}

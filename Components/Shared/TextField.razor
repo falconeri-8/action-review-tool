@@ -1,0 +1,19 @@
+@if (!string.IsNullOrWhiteSpace(Label))
+{
+    <div class="field">
+        <label class="label">@(string.IsNullOrEmpty(Index) ? "" : $"{Index} / ")@Label</label>
+        @ChildContent
+    </div>
+}
+else
+{
+    <div class="field">
+        @ChildContent
+    </div>
+}
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Index { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

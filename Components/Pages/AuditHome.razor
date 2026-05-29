@@ -1,0 +1,80 @@
+@page "/audit"
+@inject SessionState Session
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>AUDIT // HOME</PageTitle>
+
+@if (!Session.IsAuthenticated)
+{
+    <RedirectToLogin />
+}
+else
+{
+    var u = Session.Current!;
+    <div class="frame">
+        <Breadcrumb Items="@(new Breadcrumb.Crumb[] { new("Audit") })" />
+
+        <div class="welcome">
+            <span class="welcome-eyebrow">Welcome · @DateTime.Now.ToString("yyyy.MM.dd · HH:mm")</span>
+            <span class="welcome-title">@u.FullName</span>
+            <span class="welcome-text">
+                You are signed in as <span class="bright">@u.Play.ToString().ToUpperInvariant()</span>
+                · <span class="bright">@u.Role</span>.
+                Use the navigation above to proceed.
+                @switch (u.Play)
+                {
+                    case Play.Contributor:
+                        <text>Submit and track review requests, monitor decisions, and supply attachments for audit.</text>
+                        break;
+                    case Play.Reviewer:
+                        <text>Inspect pending requests filtered by your tags. Approve or reject with a comment.</text>
+                        break;
+                    case Play.Admin:
+                        <text>Operate the review center and provision new contributor or reviewer identities.</text>
+                        break;
+                }
+            </span>
+        </div>
+
+        <div class="grid-2">
+            @if (u.Play == Play.Contributor)
+            {
+                <button type="button" class="row" @onclick="@(() => Nav.NavigateTo("/audit/requests"))">
+                    <div class="row-glyph">→</div>
+                    <div class="row-body">
+                        <span class="row-title">Review Requests</span>
+                        <span class="row-sub">Submit new · Track status</span>
+                    </div>
+                </button>
+            }
+            else if (u.Play == Play.Reviewer)
+            {
+                <button type="button" class="row" @onclick="@(() => Nav.NavigateTo("/audit/center"))">
+                    <div class="row-glyph">→</div>
+                    <div class="row-body">
+                        <span class="row-title">Review Center</span>
+                        <span class="row-sub">Pending audits · Decide</span>
+                    </div>
+                </button>
+            }
+            else if (u.Play == Play.Admin)
+            {
+                <button type="button" class="row" @onclick="@(() => Nav.NavigateTo("/audit/center"))">
+                    <div class="row-glyph">→</div>
+                    <div class="row-body">
+                        <span class="row-title">Review Center</span>
+                        <span class="row-sub">Pending audits · Decide</span>
+                    </div>
+                </button>
+                <button type="button" class="row" @onclick="@(() => Nav.NavigateTo("/audit/users"))">
+                    <div class="row-glyph">+</div>
+                    <div class="row-body">
+                        <span class="row-title">Add User</span>
+                        <span class="row-sub">Provision contributor · reviewer</span>
+                    </div>
+                </button>
+            }
+        </div>
+    </div>
+}

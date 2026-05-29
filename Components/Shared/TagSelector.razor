@@ -1,0 +1,22 @@
+<TextField Label="@Label" Index="@Index">
+    <div class="tag-row">
+        @foreach (var t in Enum.GetValues<RequestTag>())
+        {
+            <button type="button" class="tag @(Selected.Contains(t) ? "is-active" : "")" @onclick="@(() => Toggle(t))">@t.ToString()</button>
+        }
+    </div>
+</TextField>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Tags";
+    [Parameter] public string? Index { get; set; }
+    [Parameter] public List<RequestTag> Selected { get; set; } = new();
+    [Parameter] public EventCallback<List<RequestTag>> SelectedChanged { get; set; }
+
+    private async Task Toggle(RequestTag t)
+    {
+        if (Selected.Contains(t)) Selected.Remove(t);
+        else Selected.Add(t);
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+}

@@ -1,0 +1,21 @@
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<div class="frame frame-narrow">
+    <div class="heading">
+        <h1>Access Required</h1>
+        <p>You must authenticate to continue</p>
+    </div>
+    <div class="btn-row">
+        <button class="btn btn-primary btn-grow" @onclick="Go">Return to Login</button>
+    </div>
+</div>
+
+@code {
+    protected override void OnAfterRender(bool first)
+    {
+        if (first) Nav.NavigateTo("/");
+    }
+
+    private void Go() => Nav.NavigateTo("/");
+}

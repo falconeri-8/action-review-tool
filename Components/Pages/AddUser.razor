@@ -1,0 +1,154 @@
+@page "/audit/users"
+@inject SessionState Session
+@inject NavigationManager Nav
+@inject UserService Users
+@rendermode InteractiveServer
+
+<PageTitle>AUDIT // USERS</PageTitle>
+
+@if (!Session.IsAuthenticated || Session.Current!.Play != Play.Admin)
+{
+    <RedirectToLogin />
+}
+else
+{
+    <div class="frame">
+        <Breadcrumb Items="@(new Breadcrumb.Crumb[] { new("Audit", "/audit"), new("Add User") })" />
+
+        <div class="heading">
+            <h1>Add User</h1>
+            <p>Provision a new contributor or reviewer identity</p>
+        </div>
+
+        <form class="col" @onsubmit="Seed" @onsubmit:preventDefault>
+            <PhotoPicker Label="Identity Image" Index="01"
+                Bytes="Photo" BytesChanged="@(b => Photo = b)"
+                ContentType="PhotoType" ContentTypeChanged="@(c => PhotoType = c)" />
+
+            <div class="grid-2">
+                <TextField Label="Full Name" Index="02">
+                    <input class="input" placeholder="LAST NAME, FIRST NAME" @bind="Name" @bind:event="oninput" />
+                </TextField>
+                <TextField Label="Contact" Index="03">
+                    <input class="input" placeholder="EMAIL OR PHONE" @bind="Contact" @bind:event="oninput" />
+                </TextField>
+            </div>
+
+            <div class="grid-2">
+                <TextField Label="Play" Index="04">
+                    <select class="select" @bind="SelectedPlay">
+                        <option value="@Play.Contributor">CONTRIBUTOR</option>
+                        <option value="@Play.Reviewer">REVIEWER</option>
+                    </select>
+                </TextField>
+                <TextField Label="Company Role" Index="05">
+                    <input class="input" placeholder="E.G. ENGINEERING LEAD" @bind="Role" @bind:event="oninput" />
+                </TextField>
+            </div>
+
+            <TextField Label="Initial Password" Index="06">
+                <input class="input" type="text" placeholder="DEFAULT: pass" @bind="Password" @bind:event="oninput" />
+            </TextField>
+
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <span class="error-line">@Error</span>
+            }
+            @if (!string.IsNullOrEmpty(Success))
+            {
+                <span class="error-line">@Success</span>
+            }
+
+            <div class="btn-row">
+                <button type="button" class="btn btn-outline btn-grow" @onclick="Cancel" disabled="@Busy">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-grow" disabled="@Busy">
+                    @(Busy ? "Seeding…" : "Seed")
+                </button>
+            </div>
+        </form>
+
+        <div class="col-tight">
+            <span class="label">07 / Existing Users</span>
+            <div class="list">
+                @if (All is null)
+                {
+                    <span class="list-empty">Loading…</span>
+                }
+                else
+                {
+                    @foreach (var u in All)
+                    {
+                        <div class="row" style="cursor:default">
+                            <div class="row-glyph">@u.Id</div>
+                            <div class="row-body">
+                                <span class="row-title">@u.FullName</span>
+                                <span class="row-sub">@u.Play.ToString().ToUpperInvariant() · @u.Role</span>
+                            </div>
+                            <span class="row-meta">@u.Contact</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string Name = "";
+    private string Contact = "";
+    private string Role = "";
+    private string Password = "pass";
+    private Play SelectedPlay = Play.Contributor;
+    private byte[]? Photo;
+    private string? PhotoType;
+    private string Error = "";
+    private string Success = "";
+    private bool Busy;
+    private List<User>? All;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() => All = await Users.ListAsync();
+
+    private void Cancel()
+    {
+        Name = "";
+        Contact = "";
+        Role = "";
+        Password = "pass";
+        SelectedPlay = Play.Contributor;
+        Photo = null;
+        PhotoType = null;
+        Error = "";
+        Success = "";
+    }
+
+    private async Task Seed()
+    {
+        Error = "";
+        Success = "";
+        if (string.IsNullOrWhiteSpace(Name)) { Error = "Full name is required"; return; }
+        if (string.IsNullOrWhiteSpace(Role)) { Error = "Role is required"; return; }
+        Busy = true;
+        try
+        {
+            var created = await Users.CreateAsync(new User
+            {
+                FullName = Name.Trim().ToUpperInvariant(),
+                Contact = Contact.Trim(),
+                Role = Role.Trim(),
+                Play = SelectedPlay,
+                Password = string.IsNullOrWhiteSpace(Password) ? "pass" : Password.Trim(),
+                Photo = Photo,
+                PhotoContentType = PhotoType
+            });
+            Success = $"Seeded · ID {created.Id} · {created.FullName}";
+            Cancel();
+            await Reload();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}

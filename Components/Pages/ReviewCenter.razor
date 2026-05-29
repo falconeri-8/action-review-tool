@@ -1,0 +1,239 @@
+@page "/audit/center"
+@inject SessionState Session
+@inject NavigationManager Nav
+@inject RequestService Requests
+@rendermode InteractiveServer
+
+<PageTitle>AUDIT // CENTER</PageTitle>
+
+@if (!Session.IsAuthenticated || (Session.Current!.Play != Play.Reviewer && Session.Current.Play != Play.Admin))
+{
+    <RedirectToLogin />
+}
+else
+{
+    <div class="frame frame-wide">
+        <Breadcrumb Items="@(new Breadcrumb.Crumb[] { new("Audit", "/audit"), new("Review Center") })" />
+
+        <div class="heading">
+            <h1>Review Center</h1>
+            <p>Inspect pending requests and submit decisions</p>
+        </div>
+
+        <div class="toolbar">
+            <TextField Label="Search" Index="01">
+                <input class="input" placeholder="ID OR TITLE · E.G. REQ-0001" @bind="Query" @bind:event="oninput" @onkeyup="OnQueryKey" />
+            </TextField>
+        </div>
+
+        <TextField Label="Tag Filter" Index="02">
+            <div class="tag-row">
+                <button type="button" class="tag @(TagFilter is null ? "is-active" : "")" @onclick="@(() => SetTag(null))">All</button>
+                @foreach (var t in Enum.GetValues<RequestTag>())
+                {
+                    <button type="button" class="tag @(TagFilter == t ? "is-active" : "")" @onclick="@(() => SetTag(t))">@t</button>
+                }
+            </div>
+        </TextField>
+
+        <div class="col-tight">
+            <span class="label">03 / Queue · Oldest First</span>
+            <div class="list">
+                @if (List is null)
+                {
+                    <span class="list-empty">Loading…</span>
+                }
+                else if (List.Count == 0)
+                {
+                    <span class="list-empty">No requests</span>
+                }
+                else
+                {
+                    @foreach (var r in List)
+                    {
+                        <RequestRow Request="r" Active="@(Selected?.Id == r.Id)" ShowReview="true" OnSelect="@(() => Open(r))" />
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <Overlay Open="ShowOverlay" OnClose="Close" Wide="true">
+        @if (Selected is not null)
+        {
+            <div class="overlay-head">
+                <div class="col-tight" style="gap:0.5rem">
+                    <span class="overlay-id">@Selected.Code</span>
+                    <span class="overlay-title">@Selected.Title</span>
+                </div>
+                <div class="col-tight" style="gap:0.5rem; align-items:flex-end">
+                    <StatusBadge Status="Selected.Status" />
+                    <span class="row-meta">@Selected.CreatedAt.ToLocalTime().ToString("yyyy.MM.dd · HH:mm")</span>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="kv">
+                    <span class="kv-key">Submitter</span>
+                    <span class="kv-val">@(Selected.Submitter?.FullName ?? "—")</span>
+                </div>
+                <div class="kv">
+                    <span class="kv-key">Role</span>
+                    <span class="kv-val">@(Selected.Submitter?.Role ?? "—")</span>
+                </div>
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Tags</span>
+                <div class="tag-row">
+                    @if (Selected.Tags.Count == 0)
+                    {
+                        <span class="muted small uppercase">None</span>
+                    }
+                    @foreach (var t in Selected.Tags)
+                    {
+                        <span class="tag is-active">@t</span>
+                    }
+                </div>
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Description</span>
+                <div class="overlay-section-body">@(string.IsNullOrWhiteSpace(Selected.Description) ? "—" : Selected.Description)</div>
+            </div>
+
+            <div class="overlay-section">
+                <span class="label">Attachments</span>
+                @if (Selected.Attachments.Count == 0)
+                {
+                    <span class="muted small uppercase">None</span>
+                }
+                else
+                {
+                    <div class="attachments-list">
+                        @foreach (var a in Selected.Attachments)
+                        {
+                            <a class="attachment-link" href="@($"/files/{a.Id}")" target="_blank" rel="noopener">
+                                <span>@a.FileName</span>
+                                <span class="attachment-size">@FormatSize(a.Size)</span>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (Selected.Status == RequestStatus.Pending)
+            {
+                <TextField Label="Reviewer Comment" Index="*">
+                    <textarea class="textarea" rows="4" placeholder="DECISION RATIONALE" @bind="ReviewComment" @bind:event="oninput"></textarea>
+                </TextField>
+
+                @if (!string.IsNullOrEmpty(ReviewError))
+                {
+                    <span class="error-line">@ReviewError</span>
+                }
+
+                <div class="btn-row">
+                    <button class="btn btn-outline btn-grow" @onclick="Close" disabled="@Deciding">Cancel</button>
+                    <button class="btn btn-secondary btn-grow" @onclick="@(() => Decide(RequestStatus.Rejected))" disabled="@Deciding">Reject</button>
+                    <button class="btn btn-primary btn-grow" @onclick="@(() => Decide(RequestStatus.Approved))" disabled="@Deciding">Approve</button>
+                </div>
+            }
+            else
+            {
+                <div class="overlay-section">
+                    <span class="label">Decision</span>
+                    <div class="overlay-section-body">
+                        <span class="bright">@Selected.Status.ToString().ToUpperInvariant()</span>
+                        @if (Selected.Reviewer is not null)
+                        {
+                            <text> · by @Selected.Reviewer.FullName</text>
+                        }
+                        @if (Selected.DecidedAt is not null)
+                        {
+                            <text> · @Selected.DecidedAt.Value.ToLocalTime().ToString("yyyy.MM.dd · HH:mm")</text>
+                        }
+                    </div>
+                </div>
+                <div class="overlay-section">
+                    <span class="label">Reviewer Comment</span>
+                    <div class="overlay-section-body">@(string.IsNullOrWhiteSpace(Selected.Comment) ? "—" : Selected.Comment)</div>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-secondary btn-grow" @onclick="Close">Close</button>
+                </div>
+            }
+        }
+    </Overlay>
+}
+
+@code {
+    private List<Request>? List;
+    private Request? Selected;
+    private bool ShowOverlay;
+    private string Query = "";
+    private RequestTag? TagFilter;
+
+    private string ReviewComment = "";
+    private string ReviewError = "";
+    private bool Deciding;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() => List = await Requests.ForReviewAsync(Query, TagFilter);
+
+    private async Task OnQueryKey(KeyboardEventArgs e) => await Reload();
+
+    private async Task SetTag(RequestTag? t)
+    {
+        TagFilter = t;
+        await Reload();
+    }
+
+    private async Task Open(Request r)
+    {
+        Selected = await Requests.FindAsync(r.Id);
+        ReviewComment = Selected?.Comment ?? "";
+        ReviewError = "";
+        ShowOverlay = true;
+    }
+
+    private void Close()
+    {
+        if (Deciding) return;
+        ShowOverlay = false;
+        Selected = null;
+        ReviewComment = "";
+        ReviewError = "";
+    }
+
+    private async Task Decide(RequestStatus decision)
+    {
+        if (Selected is null || Session.Current is null) return;
+        if (string.IsNullOrWhiteSpace(ReviewComment))
+        {
+            ReviewError = "Comment is required";
+            return;
+        }
+        Deciding = true;
+        try
+        {
+            await Requests.DecideAsync(Selected.Id, Session.Current.Id, decision, ReviewComment.Trim());
+            ShowOverlay = false;
+            Selected = null;
+            ReviewComment = "";
+            await Reload();
+        }
+        finally
+        {
+            Deciding = false;
+        }
+    }
+
+    private static string FormatSize(long b)
+    {
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{b / 1024.0:F1} KB";
+        return $"{b / 1048576.0:F1} MB";
+    }
+}

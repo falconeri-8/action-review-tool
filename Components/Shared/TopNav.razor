@@ -1,0 +1,42 @@
+@inject SessionState Session
+@inject NavigationManager Nav
+
+<nav class="nav-top">
+    <div class="nav-brand">AUDIT // @PlayLabel</div>
+    <div class="nav-actions">
+        @if (Session.Current?.Play == Play.Contributor)
+        {
+            <a class="@LinkClass("/audit/requests")" @onclick="@(() => Go("/audit/requests"))" @onclick:preventDefault>Review Requests</a>
+        }
+        else if (Session.Current?.Play == Play.Reviewer)
+        {
+            <a class="@LinkClass("/audit/center")" @onclick="@(() => Go("/audit/center"))" @onclick:preventDefault>Review Center</a>
+        }
+        else if (Session.Current?.Play == Play.Admin)
+        {
+            <a class="@LinkClass("/audit/center")" @onclick="@(() => Go("/audit/center"))" @onclick:preventDefault>Review Center</a>
+            <a class="@LinkClass("/audit/users")" @onclick="@(() => Go("/audit/users"))" @onclick:preventDefault>Add User</a>
+        }
+        <a class="nav-link nav-leave" @onclick="Leave" @onclick:preventDefault href="#">Leave</a>
+    </div>
+</nav>
+
+@code {
+    private string PlayLabel => Session.Current?.Play.ToString().ToUpperInvariant() ?? "";
+
+    private string LinkClass(string path)
+    {
+        var current = new Uri(Nav.Uri).AbsolutePath;
+        return current.StartsWith(path, StringComparison.OrdinalIgnoreCase)
+            ? "nav-link is-active"
+            : "nav-link";
+    }
+
+    private void Go(string path) => Nav.NavigateTo(path);
+
+    private void Leave()
+    {
+        Session.SignOut();
+        Nav.NavigateTo("/", forceLoad: false);
+    }
+}

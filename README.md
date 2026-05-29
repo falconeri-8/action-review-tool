@@ -1,8 +1,7 @@
 ## action-review-tool
 
-An internal tool for organizations that want to track and review updates in their ecosystem
+An internal tool for organizations that want to track and review updates in their ecosystem, built on blazor server app.
 
-\
 **Download**
 ```bash 
 git clone https://github.com/falconeri-8/action-review-tool.git 
@@ -17,3 +16,4 @@ dotnet run --urls "https://localhost:5099"
 <br>
 
 - .NET SDK 10.0 or newer
+- EFC (SQL Lite)
